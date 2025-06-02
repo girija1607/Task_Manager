@@ -1,0 +1,67 @@
+version: '3.8'
+services:
+
+  # ─────────────── Postgres + pgvector ───────────────
+  postgres-vector:
+    image: ankane/pgvector:latest
+    container_name: pg-vector-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password_here
+      POSTGRES_DB: tasksdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db_init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────── Backend (Node.js / Express) ───────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: task-backend
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      embedding-service:
+        condition: service_started
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+
+  # ─────────────── Frontend (React + Nginx) ───────────────
+  frontend:
+    container_name: task-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://backend:5000
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+  # ─────────────── Embedding Service (Python) ───────────────
+  embedding-service:
+    build:
+      context: ./embedding-service
+      dockerfile: Dockerfile
+    container_name: embedding-service
+    env_file:
+      - .env
+    ports:
+      - "6000:6000"
+
+volumes:
+  db_data:
+

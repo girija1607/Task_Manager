@@ -1,0 +1,4 @@
+flask==2.0.1
+flask-cors==3.0.10
+sentence-transformers==2.2.2
+flask-limiter==3.5.0
